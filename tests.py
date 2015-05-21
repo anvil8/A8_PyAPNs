@@ -1,49 +1,41 @@
-#!/usr/bin/env python
-# coding: utf-8
-from apns import *
-from binascii import a2b_hex
+#!/usr/bin/env python3
 from random import random
-
 import hashlib
-import os
-import time
 import unittest
 
-TEST_CERTIFICATE = "certificate.pem" # replace with path to test certificate
+from apns import *
+
+
+TEST_CERTIFICATE = "cert.pem"  # replace with path to test certificate
 
 NUM_MOCK_TOKENS = 10
 mock_tokens = []
-for i in range(0, NUM_MOCK_TOKENS):
-    mock_tokens.append(hashlib.sha256("%.12f" % random()).hexdigest())
+for i in range(NUM_MOCK_TOKENS):
+    mock_tokens.append(
+        hashlib.sha256(("%.12f" % random()).encode()).hexdigest().encode()
+    )
+
 
 def mock_chunks_generator():
-    BUF_SIZE = 64
+    buf_size = 64
     # Create fake data feed
-    data = ''
+    data = b''
 
     for t in mock_tokens:
-        token_bin       = a2b_hex(t)
-        token_length    = len(token_bin)
+        token_bin = a2b_hex(t)
+        token_length = len(token_bin)
 
         data += APNs.packed_uint_big_endian(int(time.time()))
         data += APNs.packed_ushort_big_endian(token_length)
         data += token_bin
 
     while data:
-        yield data[0:BUF_SIZE]
-        data = data[BUF_SIZE:]
+        yield data[0:buf_size]
+        data = data[buf_size:]
 
 
 class TestAPNs(unittest.TestCase):
     """Unit tests for PyAPNs"""
-
-    def setUp(self):
-        """docstring for setUp"""
-        pass
-
-    def tearDown(self):
-        """docstring for tearDown"""
-        pass
 
     def testConfigs(self):
         apns_test = APNs(use_sandbox=True)
@@ -51,17 +43,17 @@ class TestAPNs(unittest.TestCase):
 
         self.assertEqual(apns_test.gateway_server.port, 2195)
         self.assertEqual(apns_test.gateway_server.server,
-            'gateway.sandbox.push.apple.com')
+                         'gateway.sandbox.push.apple.com')
         self.assertEqual(apns_test.feedback_server.port, 2196)
         self.assertEqual(apns_test.feedback_server.server,
-            'feedback.sandbox.push.apple.com')
+                         'feedback.sandbox.push.apple.com')
 
         self.assertEqual(apns_prod.gateway_server.port, 2195)
         self.assertEqual(apns_prod.gateway_server.server,
-            'gateway.push.apple.com')
+                         'gateway.push.apple.com')
         self.assertEqual(apns_prod.feedback_server.port, 2196)
         self.assertEqual(apns_prod.feedback_server.server,
-            'feedback.push.apple.com')
+                         'feedback.push.apple.com')
 
     def testGatewayServer(self):
         pem_file = TEST_CERTIFICATE
@@ -71,11 +63,11 @@ class TestAPNs(unittest.TestCase):
         self.assertEqual(gateway_server.cert_file, apns.cert_file)
         self.assertEqual(gateway_server.key_file, apns.key_file)
 
-        token_hex = 'b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c'
-        payload   = Payload(
-            alert = "Hello World!",
-            sound = "default",
-            badge = 4
+        token_hex = '2c3f2fd92e176620be41579bee72976933755165951620f8fc2a5002bf323097'
+        payload = Payload(
+            alert="Hello World!",
+            sound="default",
+            badge=4
         )
         notification = gateway_server._get_notification(token_hex, payload)
 
@@ -88,7 +80,7 @@ class TestAPNs(unittest.TestCase):
         )
 
         self.assertEqual(len(notification), expected_length)
-        self.assertEqual(notification[0], '\0')
+        self.assertEqual(notification[0], b'\0')
 
     def testFeedbackServer(self):
         pem_file = TEST_CERTIFICATE
@@ -117,7 +109,7 @@ class TestAPNs(unittest.TestCase):
         self.assertFalse('launch-image' in d)
 
         pa = PayloadAlert('foo', action_loc_key='bar', loc_key='wibble',
-            loc_args=['king','kong'], launch_image='wobble')
+                          loc_args=['king','kong'], launch_image='wobble')
         d = pa.dict()
         self.assertEqual(d['body'], 'foo')
         self.assertEqual(d['action-loc-key'], 'bar')
@@ -184,12 +176,12 @@ class TestAPNs(unittest.TestCase):
             badge = 4
         )
         priority = 10
- 
+
         frame = Frame()
         frame.add_item(token_hex, payload, identifier, expiry, priority)
 
-        f = '\x02\x00\x00\x00t\x01\x00 \xb5\xbb\x9d\x80\x14\xa0\xf9\xb1\xd6\x1e!\xe7\x96\xd7\x8d\xcc\xdf\x13R\xf2<\xd3(\x12\xf4\x85\x0b\x87\x8a\xe4\x94L\x02\x00<{"aps":{"sound":"default","badge":4,"alert":"Hello World!"}}\x03\x00\x04\x00\x00\x00\x01\x04\x00\x04\x00\x00\x0e\x10\x05\x00\x01\n'
-        self.assertEqual(f, str(frame))
+        f = '\x02\x00\x00\x00t\x01\x00 \xb5\xbb\x9d\x80\x14\xa0\xf9\xb1\xd6\x1e!\xe7\x96\xd7\x8d\xcc\xdf\x13R\xf2<\xd3(\x12\xf4\x85\x0b\x87\x8a\xe4\x94L\x02\x00<{"aps":{"sound":"default","badge":4,"alert":"Hello World!"}}\x03\x00\x04\x00\x00\x00\x01\x04\x00\x04\x00\x00\x0e\x10\x05\x00\x01\n'.encode()
+        self.assertEqual(f, bytes(frame))
 
     def testPayloadTooLargeError(self):
         # The maximum size of the JSON payload is MAX_PAYLOAD_LENGTH 
@@ -200,13 +192,13 @@ class TestAPNs(unittest.TestCase):
 
         # Test ascii characters payload
         Payload('.' * max_raw_payload_bytes)
-        self.assertRaises(PayloadTooLargeError, Payload, 
-            '.' * (max_raw_payload_bytes + 1))
+        self.assertRaises(PayloadTooLargeError, Payload,
+                          '.' * (max_raw_payload_bytes + 1))
 
         # Test unicode 2-byte characters payload
-        Payload(u'\u0100' * int(max_raw_payload_bytes / 2))
+        Payload('\u0100' * int(max_raw_payload_bytes / 2))
         self.assertRaises(PayloadTooLargeError, Payload,
-            u'\u0100' * (int(max_raw_payload_bytes / 2) + 1))
+                          '\u0100' * (int(max_raw_payload_bytes / 2) + 1))
 
 if __name__ == '__main__':
     unittest.main()
